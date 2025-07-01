@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+mediapipe
+opencv-python
+pillow
+numpy
