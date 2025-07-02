@@ -48,6 +48,25 @@ function App() {
               ))}
             </ul>
           </div>
+          {result.ratios && (
+            <div className="mt-4">
+              <p className="font-semibold">Face Ratios:</p>
+              <ul className="list-disc list-inside text-left inline-block">
+                <li>
+                  <span className="font-medium">Face Length / Cheekbone Width:</span>{' '}
+                  {result.ratios.face_length_width_ratio.toFixed(2)}
+                </li>
+                <li>
+                  <span className="font-medium">Forehead / Jaw Width:</span>{' '}
+                  {result.ratios.forehead_jaw_ratio.toFixed(2)}
+                </li>
+                <li>
+                  <span className="font-medium">Jaw / Cheekbone Width:</span>{' '}
+                  {result.ratios.jaw_cheekbone_ratio.toFixed(2)}
+                </li>
+              </ul>
+            </div>
+          )}
         </div>
       )}
     </div>

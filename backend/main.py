@@ -92,5 +92,22 @@ def analyze_face(payload: ImagePayload):
     landmarks = detect_landmarks(img)
     measurements = extract_measurements(landmarks, img.shape)
     face_shape = classify_face_shape(measurements)
+    fw = measurements["forehead_width"]
+    cw = measurements["cheekbone_width"]
+    jw = measurements["jaw_width"]
+    fl = measurements["face_length"]
+
+    face_length_width_ratio = fl / cw if cw else 0
+    forehead_jaw_ratio = fw / jw if jw else 0
+    jaw_cheekbone_ratio = jw / cw if cw else 0
+
     rec = RECOMMENDATIONS.get(face_shape, {})
-    return {"face_shape": face_shape, "recommendations": rec}
+    return {
+        "face_shape": face_shape,
+        "recommendations": rec,
+        "ratios": {
+            "face_length_width_ratio": face_length_width_ratio,
+            "forehead_jaw_ratio": forehead_jaw_ratio,
+            "jaw_cheekbone_ratio": jaw_cheekbone_ratio,
+        }
+    }
