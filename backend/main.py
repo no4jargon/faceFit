@@ -147,13 +147,5 @@ def analyze_face(payload: ImagePayload):
             "face_length_width_ratio": face_length_width_ratio,
             "forehead_jaw_ratio": forehead_jaw_ratio,
             "jaw_cheekbone_ratio": jaw_cheekbone_ratio,
-        },
+        }
     }
-
-
-@app.post("/api/analyze-face-vlm")
-def analyze_face_vlm(payload: ImagePayload):
-    """Analyze face shape using OpenAI's vision model."""
-    shape = classify_face_shape_vlm(payload.image)
-    rec = RECOMMENDATIONS.get(shape, {})
-    return {"face_shape": shape, "recommendations": rec}
