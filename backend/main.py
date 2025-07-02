@@ -4,7 +4,6 @@ import base64
 from PIL import Image
 from io import BytesIO
 import numpy as np
-import cv2
 import mediapipe as mp
 import os
 from openai import OpenAI
@@ -33,14 +32,15 @@ def decode_image(data: str) -> np.ndarray:
     try:
         image_data = base64.b64decode(data)
         image = Image.open(BytesIO(image_data)).convert("RGB")
-        return cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
+        return np.array(image)  # RGB numpy array
     except Exception as e:
         raise HTTPException(status_code=400, detail="Invalid image data") from e
 
 
 def detect_landmarks(img: np.ndarray):
+    # img is RGB numpy array
     with mp_face_mesh.FaceMesh(static_image_mode=True) as face_mesh:
-        results = face_mesh.process(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+        results = face_mesh.process(img)
         if not results.multi_face_landmarks:
             raise HTTPException(status_code=400, detail="No face detected")
         return results.multi_face_landmarks[0]
