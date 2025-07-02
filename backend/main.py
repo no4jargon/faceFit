@@ -6,6 +6,8 @@ from io import BytesIO
 import numpy as np
 import cv2
 import mediapipe as mp
+import os
+import openai
 
 app = FastAPI()
 
@@ -86,11 +88,72 @@ def classify_face_shape(measurements):
     return "Oval"
 
 
+def classify_face_shape_vlm(image_b64: str) -> str:
+    """Classify face shape using OpenAI's vision model."""
+    openai.api_key = os.getenv("OPENAI_API_KEY")
+    if not openai.api_key:
+        raise HTTPException(status_code=500, detail="OpenAI API key not configured")
+
+    prompt = (
+        "Classify the face into one of the following shapes: "
+        "Oval, Round, Square, Rectangular, Heart, Diamond. "
+        "Respond with only the shape name."
+    )
+
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-4-vision-preview",
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": prompt},
+                        {"type": "image_url", "image_url": f"data:image/jpeg;base64,{image_b64}"},
+                    ],
+                }
+            ],
+            max_tokens=10,
+        )
+        text = response.choices[0].message.content.strip()
+        text = text.split()[0]
+        for shape in RECOMMENDATIONS:
+            if text.lower().startswith(shape.lower()):
+                return shape
+        return text
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="OpenAI API call failed") from e
+
+
 @app.post("/api/analyze-face")
 def analyze_face(payload: ImagePayload):
     img = decode_image(payload.image)
     landmarks = detect_landmarks(img)
     measurements = extract_measurements(landmarks, img.shape)
     face_shape = classify_face_shape(measurements)
+    fw = measurements["forehead_width"]
+    cw = measurements["cheekbone_width"]
+    jw = measurements["jaw_width"]
+    fl = measurements["face_length"]
+
+    face_length_width_ratio = fl / cw if cw else 0
+    forehead_jaw_ratio = fw / jw if jw else 0
+    jaw_cheekbone_ratio = jw / cw if cw else 0
+
     rec = RECOMMENDATIONS.get(face_shape, {})
-    return {"face_shape": face_shape, "recommendations": rec}
+    return {
+        "face_shape": face_shape,
+        "recommendations": rec,
+        "ratios": {
+            "face_length_width_ratio": face_length_width_ratio,
+            "forehead_jaw_ratio": forehead_jaw_ratio,
+            "jaw_cheekbone_ratio": jaw_cheekbone_ratio,
+        },
+    }
+
+
+@app.post("/api/analyze-face-vlm")
+def analyze_face_vlm(payload: ImagePayload):
+    """Analyze face shape using OpenAI's vision model."""
+    shape = classify_face_shape_vlm(payload.image)
+    rec = RECOMMENDATIONS.get(shape, {})
+    return {"face_shape": shape, "recommendations": rec}
