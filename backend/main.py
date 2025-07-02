@@ -7,7 +7,9 @@ import numpy as np
 import cv2
 import mediapipe as mp
 import os
-import openai
+from openai import OpenAI
+
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 app = FastAPI()
 
@@ -90,37 +92,34 @@ def classify_face_shape(measurements):
 
 def classify_face_shape_vlm(image_b64: str) -> str:
     """Classify face shape using OpenAI's vision model."""
-    openai.api_key = os.getenv("OPENAI_API_KEY")
-    if not openai.api_key:
-        raise HTTPException(status_code=500, detail="OpenAI API key not configured")
-
+    print("Using OpenAI VLM for face shape classification...")
+    print("OpenAI API key is set.")
     prompt = (
         "Classify the face into one of the following shapes: "
-        "Oval, Round, Square, Rectangular, Heart, Diamond. "
+        "Egg, Round, Square, Rectangular, Inverted Triangle, Triangle"
+        "Take into account the forehead, cheekbones, jawline, and face length."
+        "And shadows, lighting, and other factors that may affect the appearance of the face."
         "Respond with only the shape name."
     )
 
     try:
-        response = openai.ChatCompletion.create(
-            model="gpt-4-vision-preview",
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": prompt},
-                        {"type": "image_url", "image_url": f"data:image/jpeg;base64,{image_b64}"},
-                    ],
-                }
-            ],
-            max_tokens=10,
+        response = client.responses.create(
+            model="gpt-4.1-mini",
+            input=[{
+                "role": "user",
+                "content": [
+                    {"type": "input_text", "text": prompt},
+                    {
+                        "type": "input_image",
+                        "image_url": f"data:image/jpeg;base64,{image_b64}",
+                    },
+                ],
+            }],
         )
-        text = response.choices[0].message.content.strip()
-        text = text.split()[0]
-        for shape in RECOMMENDATIONS:
-            if text.lower().startswith(shape.lower()):
-                return shape
+        text = response.output_text
         return text
     except Exception as e:
+        print("OpenAI API error:", e)
         raise HTTPException(status_code=500, detail="OpenAI API call failed") from e
 
 
@@ -130,6 +129,8 @@ def analyze_face(payload: ImagePayload):
     landmarks = detect_landmarks(img)
     measurements = extract_measurements(landmarks, img.shape)
     face_shape = classify_face_shape(measurements)
+    face_shape = classify_face_shape_vlm(payload.image)
+    print(face_shape)
     fw = measurements["forehead_width"]
     cw = measurements["cheekbone_width"]
     jw = measurements["jaw_width"]
