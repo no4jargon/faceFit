@@ -6,6 +6,8 @@ from io import BytesIO
 import numpy as np
 import cv2
 import mediapipe as mp
+import os
+import openai
 
 app = FastAPI()
 
@@ -84,6 +86,42 @@ def classify_face_shape(measurements):
         else:
             return "Round"
     return "Oval"
+
+
+def classify_face_shape_vlm(image_b64: str) -> str:
+    """Classify face shape using OpenAI's vision model."""
+    openai.api_key = os.getenv("OPENAI_API_KEY")
+    if not openai.api_key:
+        raise HTTPException(status_code=500, detail="OpenAI API key not configured")
+
+    prompt = (
+        "Classify the face into one of the following shapes: "
+        "Oval, Round, Square, Rectangular, Heart, Diamond. "
+        "Respond with only the shape name."
+    )
+
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-4-vision-preview",
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": prompt},
+                        {"type": "image_url", "image_url": f"data:image/jpeg;base64,{image_b64}"},
+                    ],
+                }
+            ],
+            max_tokens=10,
+        )
+        text = response.choices[0].message.content.strip()
+        text = text.split()[0]
+        for shape in RECOMMENDATIONS:
+            if text.lower().startswith(shape.lower()):
+                return shape
+        return text
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="OpenAI API call failed") from e
 
 
 @app.post("/api/analyze-face")
