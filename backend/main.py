@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import base64
 from PIL import Image
@@ -11,6 +12,14 @@ from openai import OpenAI
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Sunglasses recommendations
 RECOMMENDATIONS = {
@@ -30,8 +39,10 @@ mp_face_mesh = mp.solutions.face_mesh
 
 def decode_image(data: str) -> np.ndarray:
     try:
+        print("Decoding image data, length:", len(data))
         image_data = base64.b64decode(data)
         image = Image.open(BytesIO(image_data)).convert("RGB")
+        print("Image decoded successfully")
         return np.array(image)  # RGB numpy array
     except Exception as e:
         raise HTTPException(status_code=400, detail="Invalid image data") from e
@@ -39,14 +50,17 @@ def decode_image(data: str) -> np.ndarray:
 
 def detect_landmarks(img: np.ndarray):
     # img is RGB numpy array
+    print("Detecting face landmarks")
     with mp_face_mesh.FaceMesh(static_image_mode=True) as face_mesh:
         results = face_mesh.process(img)
         if not results.multi_face_landmarks:
             raise HTTPException(status_code=400, detail="No face detected")
+        print("Landmarks detected")
         return results.multi_face_landmarks[0]
 
 
 def extract_measurements(landmarks, img_shape):
+    print("Extracting face measurements")
     h, w, _ = img_shape
     get_point = lambda idx: np.array([landmarks.landmark[idx].x * w, landmarks.landmark[idx].y * h])
 
@@ -55,12 +69,14 @@ def extract_measurements(landmarks, img_shape):
     jaw_width = np.linalg.norm(get_point(152) - get_point(378))
     face_length = np.linalg.norm(get_point(10) - get_point(152))
 
-    return {
+    measurements = {
         "forehead_width": forehead_width,
         "cheekbone_width": cheekbone_width,
         "jaw_width": jaw_width,
         "face_length": face_length,
     }
+    print("Measurements:", measurements)
+    return measurements
 
 
 def classify_face_shape(measurements):
@@ -73,21 +89,33 @@ def classify_face_shape(measurements):
     forehead_jaw_ratio = fw / jw if jw else 0
     jaw_cheekbone_ratio = jw / cw if cw else 0
 
+    print(
+        "Ratios:",
+        {
+            "face_length_width": face_length_width_ratio,
+            "forehead_jaw": forehead_jaw_ratio,
+            "jaw_cheekbone": jaw_cheekbone_ratio,
+        },
+    )
+
     if face_length_width_ratio > 1.5:
-        return "Rectangular"
+        shape = "Rectangular"
     elif 1.3 <= face_length_width_ratio <= 1.6:
         if jaw_cheekbone_ratio < 0.9:
-            return "Oval"
+            shape = "Oval"
         else:
-            return "Diamond"
+            shape = "Diamond"
     elif face_length_width_ratio <= 1.2:
         if jaw_cheekbone_ratio > 0.95:
-            return "Square"
+            shape = "Square"
         elif forehead_jaw_ratio > 1.1:
-            return "Heart"
+            shape = "Heart"
         else:
-            return "Round"
-    return "Oval"
+            shape = "Round"
+    else:
+        shape = "Oval"
+    print("Heuristic face shape:", shape)
+    return shape
 
 
 def classify_face_shape_vlm(image_b64: str) -> str:
@@ -125,12 +153,14 @@ def classify_face_shape_vlm(image_b64: str) -> str:
 
 @app.post("/api/analyze-face")
 def analyze_face(payload: ImagePayload):
+    print("Received request to /api/analyze-face")
     img = decode_image(payload.image)
     landmarks = detect_landmarks(img)
     measurements = extract_measurements(landmarks, img.shape)
-    face_shape = classify_face_shape(measurements)
-    face_shape = classify_face_shape_vlm(payload.image)
-    print(face_shape)
+    heuristic_shape = classify_face_shape(measurements)
+    vlm_shape = classify_face_shape_vlm(payload.image)
+    print("VLM classification:", vlm_shape)
+    face_shape = vlm_shape
     fw = measurements["forehead_width"]
     cw = measurements["cheekbone_width"]
     jw = measurements["jaw_width"]
@@ -141,6 +171,7 @@ def analyze_face(payload: ImagePayload):
     jaw_cheekbone_ratio = jw / cw if cw else 0
 
     rec = RECOMMENDATIONS.get(face_shape, {})
+    print("Returning analysis for shape:", face_shape)
     return {
         "face_shape": face_shape,
         "recommendations": rec,
