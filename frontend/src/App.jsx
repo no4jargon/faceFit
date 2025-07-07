@@ -14,7 +14,7 @@ function App() {
     reader.onloadend = async () => {
       const base64 = reader.result.split(',')[1]
       try {
-        const NGROK_URL = 'https://b258-2409-40c0-1016-c6e8-c5c1-5282-a07-4b48.ngrok-free.app';  // your tunnel
+        const NGROK_URL = 'https://29ce-103-185-235-219.ngrok-free.app';  // your tunnel
         const res = await axios.post(`${NGROK_URL}/api/analyze-face`, { image: base64 });
         setResult(res.data)
         setError(null)
