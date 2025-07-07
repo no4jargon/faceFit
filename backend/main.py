@@ -8,8 +8,10 @@ import numpy as np
 import mediapipe as mp
 import os
 from openai import OpenAI
+import google.generativeai as genai
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+# Client will be created lazily when needed so tests don't require API keys
+client = None
 
 app = FastAPI()
 
@@ -31,8 +33,10 @@ RECOMMENDATIONS = {
     "Diamond": {"recommended": ["Oval", "Cat-eye"], "avoid": ["Very Narrow"]},
 }
 
-class ImagePayload(BaseModel):
+class AnalyzePayload(BaseModel):
     image: str  # base64 encoded string
+    method: str
+    api_key: str | None = None
 
 mp_face_mesh = mp.solutions.face_mesh
 
@@ -118,49 +122,64 @@ def classify_face_shape(measurements):
     return shape
 
 
-def classify_face_shape_vlm(image_b64: str) -> str:
-    """Classify face shape using OpenAI's vision model."""
-    print("Using OpenAI VLM for face shape classification...")
-    print("OpenAI API key is set.")
+def classify_face_shape_vlm(image_b64: str, provider: str, api_key: str) -> str:
+    """Classify face shape using a vision language model."""
     prompt = (
         "Classify the face into one of the following shapes: "
-        "Egg, Round, Square, Rectangular, Inverted Triangle, Triangle"
-        "Take into account the forehead, cheekbones, jawline, and face length."
-        "And shadows, lighting, and other factors that may affect the appearance of the face."
+        "Egg, Round, Square, Rectangular, Inverted Triangle, Triangle. "
+        "Take into account the forehead, cheekbones, jawline, and face length. "
         "Respond with only the shape name."
     )
 
     try:
-        response = client.responses.create(
-            model="gpt-4.1-mini",
-            input=[{
-                "role": "user",
-                "content": [
-                    {"type": "input_text", "text": prompt},
+        if provider == "openai":
+            if not api_key:
+                raise HTTPException(status_code=400, detail="OpenAI API key required")
+            client = OpenAI(api_key=api_key)
+            response = client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
                     {
-                        "type": "input_image",
-                        "image_url": f"data:image/jpeg;base64,{image_b64}",
-                    },
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": prompt},
+                            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_b64}"}},
+                        ],
+                    }
                 ],
-            }],
-        )
-        text = response.output_text
-        return text
+            )
+            return response.choices[0].message.content.strip()
+        elif provider == "gemini":
+            if not api_key:
+                raise HTTPException(status_code=400, detail="Gemini API key required")
+            genai.configure(api_key=api_key)
+            model = genai.GenerativeModel("gemini-pro-vision")
+            result = model.generate_content([prompt, image_b64])
+            return result.text.strip()
+        else:
+            raise HTTPException(status_code=400, detail="Unknown provider")
+    except HTTPException:
+        raise
     except Exception as e:
-        print("OpenAI API error:", e)
-        raise HTTPException(status_code=500, detail="OpenAI API call failed") from e
+        print("VLM API error:", e)
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.post("/api/analyze-face")
-def analyze_face(payload: ImagePayload):
-    print("Received request to /api/analyze-face")
+def analyze_face(payload: AnalyzePayload):
+    print("Received request to /api/analyze-face with method", payload.method)
     img = decode_image(payload.image)
     landmarks = detect_landmarks(img)
     measurements = extract_measurements(landmarks, img.shape)
-    heuristic_shape = classify_face_shape(measurements)
-    vlm_shape = classify_face_shape_vlm(payload.image)
-    print("VLM classification:", vlm_shape)
-    face_shape = vlm_shape
+
+    if payload.method == "mediapipe":
+        face_shape = classify_face_shape(measurements)
+    elif payload.method in {"openai", "gemini"}:
+        face_shape = classify_face_shape_vlm(payload.image, payload.method, payload.api_key or "")
+    elif payload.method == "open_source":
+        face_shape = classify_face_shape(measurements)
+    else:
+        raise HTTPException(status_code=400, detail="Invalid method")
     fw = measurements["forehead_width"]
     cw = measurements["cheekbone_width"]
     jw = measurements["jaw_width"]

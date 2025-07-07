@@ -5,3 +5,4 @@ mediapipe
 pillow
 numpy
 openai
+google-generativeai
