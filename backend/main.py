@@ -25,12 +25,12 @@ app.add_middleware(
 
 # Sunglasses recommendations
 RECOMMENDATIONS = {
-    "Oval": {"recommended": ["Square", "Rectangle", "Aviator"], "avoid": ["Oversized"]},
-    "Round": {"recommended": ["Rectangle", "Square", "Cat-eye"], "avoid": ["Round"]},
-    "Square": {"recommended": ["Round", "Oval", "Aviator"], "avoid": ["Square"]},
-    "Rectangular": {"recommended": ["Large Wayfarers", "Aviator", "Round"], "avoid": ["Narrow"]},
-    "Heart": {"recommended": ["Aviator", "Round", "Cat-eye"], "avoid": ["Oversized"]},
-    "Diamond": {"recommended": ["Oval", "Cat-eye"], "avoid": ["Very Narrow"]},
+    "Egg": {"recommended": ["Most styles", "Aviator", "Square"], "avoid": ["Very narrow"]},
+    "Round": {"recommended": ["Rectangle", "Square", "Wayfarer"], "avoid": ["Round", "Oval"]},
+    "Square": {"recommended": ["Round", "Oval", "Aviator"], "avoid": ["Square", "Rectangle"]},
+    "Rectangular": {"recommended": ["Large Wayfarers", "Round", "Oversized"], "avoid": ["Narrow", "Rectangle"]},
+    "Inverted Triangle": {"recommended": ["Aviator", "Rimless", "Oval"], "avoid": ["Top-heavy frames"]},
+    "Triangle": {"recommended": ["Cat-eye", "Rectangular", "Semi-rimless"], "avoid": ["Very narrow"]}
 }
 
 class AnalyzePayload(BaseModel):
