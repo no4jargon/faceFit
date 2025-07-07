@@ -6,36 +6,58 @@ const API_URL = 'https://facefit-nntu.onrender.com/api/analyze-face'
 
 function App() {
   const [image, setImage] = useState(null)
+  const [method, setMethod] = useState('mediapipe')
+  const [apiKey, setApiKey] = useState('')
   const [result, setResult] = useState(null)
   const [error, setError] = useState(null)
 
-  const handleFile = async (e) => {
+  const handleFile = (e) => {
     const file = e.target.files[0]
     if (!file) return
-    console.log('Selected file:', file)
     const reader = new FileReader()
-    reader.onloadend = async () => {
+    reader.onloadend = () => {
       const base64 = reader.result.split(',')[1]
       setImage(base64)
-      console.log('Base64 length:', base64.length)
-      try {
-        console.log('Sending POST request to', API_URL)
-        const res = await axios.post(API_URL, { image: base64 })
-        console.log('Response:', res.data)
-        setResult(res.data)
-        setError(null)
-      } catch (err) {
-        console.error('API error:', err)
-        setError('Unable to analyze image')
-      }
     }
     reader.readAsDataURL(file)
+  }
+
+  const processImage = async () => {
+    if (!image) return
+    try {
+      const payload = { image, method, api_key: apiKey }
+      const res = await axios.post(API_URL, payload)
+      setResult(res.data)
+      setError(null)
+    } catch (err) {
+      console.error('API error:', err)
+      const msg = err.response?.data?.detail || err.message || 'Unable to analyze image'
+      setError(msg)
+    }
   }
 
   return (
     <div className="min-h-screen flex flex-col items-center p-4 gap-4">
       <h1 className="text-2xl font-bold">FaceFit</h1>
       <input type="file" accept="image/*" onChange={handleFile} className="border p-2" />
+      <select value={method} onChange={(e) => setMethod(e.target.value)} className="border p-2">
+        <option value="mediapipe">Mediapipe Ratios</option>
+        <option value="openai">OpenAI</option>
+        <option value="gemini">Gemini</option>
+        <option value="open_source">Open Source VLM</option>
+      </select>
+      {(method === 'openai' || method === 'gemini') && (
+        <input
+          type="text"
+          placeholder="API Key"
+          value={apiKey}
+          onChange={(e) => setApiKey(e.target.value)}
+          className="border p-2 w-72"
+        />
+      )}
+      <button onClick={processImage} className="bg-blue-500 text-white px-4 py-2 rounded">
+        Process
+      </button>
       {error && <p className="text-red-500">{error}</p>}
       {result && (
         <div className="mt-4 text-center">
