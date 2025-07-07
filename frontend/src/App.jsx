@@ -2,6 +2,8 @@ import { useState } from 'react'
 import axios from 'axios'
 import './index.css'
 
+const API_URL = 'https://facefit-nntu.onrender.com/api/analyze-face'
+
 function App() {
   const [image, setImage] = useState(null)
   const [result, setResult] = useState(null)
@@ -10,14 +12,20 @@ function App() {
   const handleFile = async (e) => {
     const file = e.target.files[0]
     if (!file) return
+    console.log('Selected file:', file)
     const reader = new FileReader()
     reader.onloadend = async () => {
       const base64 = reader.result.split(',')[1]
+      setImage(base64)
+      console.log('Base64 length:', base64.length)
       try {
-        const res = await axios.post('https://facefit-nntu.onrender.com/api/analyze-face', { image: base64 })
+        console.log('Sending POST request to', API_URL)
+        const res = await axios.post(API_URL, { image: base64 })
+        console.log('Response:', res.data)
         setResult(res.data)
         setError(null)
       } catch (err) {
+        console.error('API error:', err)
         setError('Unable to analyze image')
       }
     }
