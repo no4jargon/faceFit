@@ -9,6 +9,18 @@ import mediapipe as mp
 import os
 from openai import OpenAI
 import google.generativeai as genai
+import builtins
+
+# Capture log messages so the frontend can display them
+LOGS: list[str] = []
+
+def log(*args, **kwargs):
+    message = " ".join(str(a) for a in args)
+    LOGS.append(message)
+    # keep only the last 100 lines
+    if len(LOGS) > 100:
+        del LOGS[0]
+    builtins.print(*args, **kwargs)
 
 # Client will be created lazily when needed so tests don't require API keys
 client = None
@@ -43,10 +55,10 @@ mp_face_mesh = mp.solutions.face_mesh
 
 def decode_image(data: str) -> np.ndarray:
     try:
-        print("Decoding image data, length:", len(data))
+        log("Decoding image data, length:", len(data))
         image_data = base64.b64decode(data)
         image = Image.open(BytesIO(image_data)).convert("RGB")
-        print("Image decoded successfully")
+        log("Image decoded successfully")
         return np.array(image)  # RGB numpy array
     except Exception as e:
         raise HTTPException(status_code=400, detail="Invalid image data") from e
@@ -54,17 +66,17 @@ def decode_image(data: str) -> np.ndarray:
 
 def detect_landmarks(img: np.ndarray):
     # img is RGB numpy array
-    print("Detecting face landmarks")
+    log("Detecting face landmarks")
     with mp_face_mesh.FaceMesh(static_image_mode=True) as face_mesh:
         results = face_mesh.process(img)
         if not results.multi_face_landmarks:
             raise HTTPException(status_code=400, detail="No face detected")
-        print("Landmarks detected")
+        log("Landmarks detected")
         return results.multi_face_landmarks[0]
 
 
 def extract_measurements(landmarks, img_shape):
-    print("Extracting face measurements")
+    log("Extracting face measurements")
     h, w, _ = img_shape
     get_point = lambda idx: np.array([landmarks.landmark[idx].x * w, landmarks.landmark[idx].y * h])
 
@@ -79,7 +91,7 @@ def extract_measurements(landmarks, img_shape):
         "jaw_width": jaw_width,
         "face_length": face_length,
     }
-    print("Measurements:", measurements)
+    log("Measurements:", measurements)
     return measurements
 
 
@@ -93,7 +105,7 @@ def classify_face_shape(measurements):
     forehead_jaw_ratio = fw / jw if jw else 0
     jaw_cheekbone_ratio = jw / cw if cw else 0
 
-    print(
+    log(
         "Ratios:",
         {
             "face_length_width": face_length_width_ratio,
@@ -118,7 +130,7 @@ def classify_face_shape(measurements):
             shape = "Round"
     else:
         shape = "Oval"
-    print("Heuristic face shape:", shape)
+    log("Heuristic face shape:", shape)
     return shape
 
 
@@ -163,13 +175,13 @@ def classify_face_shape_vlm(image_b64: str, provider: str, api_key: str | None) 
     except HTTPException:
         raise
     except Exception as e:
-        print("VLM API error:", e)
+        log("VLM API error:", e)
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.post("/api/analyze-face")
 def analyze_face(payload: AnalyzePayload):
-    print("Received request to /api/analyze-face with method", payload.method)
+    log("Received request to /api/analyze-face with method", payload.method)
     img = decode_image(payload.image)
     landmarks = detect_landmarks(img)
     measurements = extract_measurements(landmarks, img.shape)
@@ -191,8 +203,8 @@ def analyze_face(payload: AnalyzePayload):
     forehead_jaw_ratio = fw / jw if jw else 0
     jaw_cheekbone_ratio = jw / cw if cw else 0
 
-    rec = RECOMMENDATIONS.get(face_shape, {})
-    print("Returning analysis for shape:", face_shape)
+    rec = RECOMMENDATIONS.get(face_shape, {"recommended": [], "avoid": []})
+    log("Returning analysis for shape:", face_shape)
     return {
         "face_shape": face_shape,
         "recommendations": rec,
@@ -202,3 +214,9 @@ def analyze_face(payload: AnalyzePayload):
             "jaw_cheekbone_ratio": jaw_cheekbone_ratio,
         }
     }
+
+
+@app.get("/api/logs")
+def get_logs():
+    """Return recent backend log messages."""
+    return {"logs": LOGS}

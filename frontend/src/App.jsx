@@ -4,7 +4,9 @@ import { FaceMesh, FACEMESH_TESSELATION } from '@mediapipe/face_mesh'
 import { drawConnectors } from '@mediapipe/drawing_utils'
 import './index.css'
 
-const API_URL = 'https://facefit-nntu.onrender.com/api/analyze-face'
+const API_BASE = 'https://facefit-nntu.onrender.com/api'
+const API_URL = `${API_BASE}/analyze-face`
+const LOGS_URL = `${API_BASE}/logs`
 
 function App() {
   const [image, setImage] = useState(null)
@@ -12,6 +14,8 @@ function App() {
   const [apiKey, setApiKey] = useState('')
   const [result, setResult] = useState(null)
   const [error, setError] = useState(null)
+
+  const [logs, setLogs] = useState([])
 
   const [mode, setMode] = useState('upload') // upload or selfie
   const [showCamera, setShowCamera] = useState(false)
@@ -77,6 +81,37 @@ function App() {
       faceMeshRef.current = faceMesh
     }
   }, [showCamera, processing])
+
+  // Periodically fetch backend logs
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const res = await axios.get(LOGS_URL)
+        setLogs((prev) => [...prev, ...res.data.logs.filter((l) => !prev.includes(l))])
+      } catch (err) {
+        // ignore errors when fetching logs
+      }
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [])
+
+  // Capture frontend console messages
+  useEffect(() => {
+    const origLog = console.log
+    const origErr = console.error
+    console.log = (...args) => {
+      setLogs((prev) => [...prev, args.join(' ')])
+      origLog(...args)
+    }
+    console.error = (...args) => {
+      setLogs((prev) => [...prev, args.join(' ')])
+      origErr(...args)
+    }
+    return () => {
+      console.log = origLog
+      console.error = origErr
+    }
+  }, [])
 
   const animateProcessing = () => {
     const start = Date.now()
@@ -205,7 +240,7 @@ function App() {
           <div className="mt-2">
             <p className="font-semibold">Recommended:</p>
             <ul>
-              {result.recommendations.recommended.map((item) => (
+              {(result.recommendations?.recommended || []).map((item) => (
                 <li key={item}>{item}</li>
               ))}
             </ul>
@@ -213,7 +248,7 @@ function App() {
           <div className="mt-2">
             <p className="font-semibold">Avoid:</p>
             <ul>
-              {result.recommendations.avoid.map((item) => (
+              {(result.recommendations?.avoid || []).map((item) => (
                 <li key={item}>{item}</li>
               ))}
             </ul>
@@ -254,6 +289,12 @@ function App() {
           <canvas ref={canvasRef} className="hidden" />
         </div>
       )}
+      <div className="mt-4 w-full">
+        <h2 className="font-semibold">Console</h2>
+        <pre className="bg-gray-900 text-green-400 p-2 h-40 overflow-y-scroll text-xs">
+          {logs.join('\n')}
+        </pre>
+      </div>
     </div>
   )
 }
