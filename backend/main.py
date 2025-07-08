@@ -122,7 +122,7 @@ def classify_face_shape(measurements):
     return shape
 
 
-def classify_face_shape_vlm(image_b64: str, provider: str, api_key: str) -> str:
+def classify_face_shape_vlm(image_b64: str, provider: str, api_key: str | None) -> str:
     """Classify face shape using a vision language model."""
     prompt = (
         "Classify the face into one of the following shapes: "
@@ -133,9 +133,10 @@ def classify_face_shape_vlm(image_b64: str, provider: str, api_key: str) -> str:
 
     try:
         if provider == "openai":
-            if not api_key:
+            key = api_key or os.getenv("OPENAI_API_KEY")
+            if not key:
                 raise HTTPException(status_code=400, detail="OpenAI API key required")
-            client = OpenAI(api_key=api_key)
+            client = OpenAI(api_key=key)
             response = client.chat.completions.create(
                 model="gpt-4o",
                 messages=[
@@ -150,9 +151,10 @@ def classify_face_shape_vlm(image_b64: str, provider: str, api_key: str) -> str:
             )
             return response.choices[0].message.content.strip()
         elif provider == "gemini":
-            if not api_key:
+            key = api_key or os.getenv("GEMINI_API_KEY")
+            if not key:
                 raise HTTPException(status_code=400, detail="Gemini API key required")
-            genai.configure(api_key=api_key)
+            genai.configure(api_key=key)
             model = genai.GenerativeModel("gemini-pro-vision")
             result = model.generate_content([prompt, image_b64])
             return result.text.strip()
