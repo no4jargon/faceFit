@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import axios from 'axios'
 import { FaceMesh, FACEMESH_TESSELATION } from '@mediapipe/face_mesh'
 import { drawConnectors } from '@mediapipe/drawing_utils'
+import * as THREE from 'three'
 import './index.css'
 
 const API_BASE = 'https://facefit-nntu.onrender.com/api'
@@ -24,6 +25,7 @@ function App() {
   const videoRef = useRef(null)
   const canvasRef = useRef(null)
   const overlayRef = useRef(null)
+  const threeRef = useRef(null)
   const faceMeshRef = useRef(null)
 
   const handleFile = (e) => {
@@ -63,6 +65,7 @@ function App() {
   }
 
   useEffect(() => {
+    const container = threeRef.current
     if (showCamera) {
       startCamera()
       const faceMesh = new FaceMesh({
@@ -79,6 +82,50 @@ function App() {
         }
       })
       faceMeshRef.current = faceMesh
+
+      // Three.js setup
+      if (container) {
+        container.innerHTML = ''
+        const width = videoRef.current?.videoWidth || 640
+        const height = videoRef.current?.videoHeight || 480
+        const renderer = new THREE.WebGLRenderer({ alpha: true })
+        renderer.setSize(width, height)
+        renderer.domElement.style.position = 'absolute'
+        renderer.domElement.style.top = 0
+        renderer.domElement.style.left = 0
+        renderer.domElement.style.pointerEvents = 'none'
+        container.appendChild(renderer.domElement)
+
+        const scene = new THREE.Scene()
+        const camera = new THREE.PerspectiveCamera(70, width / height, 0.1, 1000)
+        camera.position.z = 5
+        const geometry = new THREE.TorusKnotGeometry(1, 0.3, 128, 16)
+        const material = new THREE.MeshBasicMaterial({ color: 0x00ffff, wireframe: true })
+        const mesh = new THREE.Mesh(geometry, material)
+        scene.add(mesh)
+
+        const animate = () => {
+          mesh.rotation.x += 0.01
+          mesh.rotation.y += 0.01
+          renderer.render(scene, camera)
+          container._anim = requestAnimationFrame(animate)
+        }
+        animate()
+
+        container._cleanup = () => {
+          cancelAnimationFrame(container._anim)
+          renderer.dispose()
+          geometry.dispose()
+          material.dispose()
+        }
+      }
+    }
+
+    return () => {
+      if (container && container._cleanup) {
+        container._cleanup()
+        container.innerHTML = ''
+      }
     }
   }, [showCamera, processing])
 
@@ -88,7 +135,7 @@ function App() {
       try {
         const res = await axios.get(LOGS_URL)
         setLogs((prev) => [...prev, ...res.data.logs.filter((l) => !prev.includes(l))])
-      } catch (err) {
+      } catch {
         // ignore errors when fetching logs
       }
     }, 1000)
@@ -279,6 +326,7 @@ function App() {
           <div className="relative">
             <video ref={videoRef} className="w-80 h-auto" autoPlay playsInline />
             <canvas ref={overlayRef} className="absolute top-0 left-0" />
+            <div ref={threeRef} className="absolute top-0 left-0" />
           </div>
           <button onClick={captureSelfie} className="mt-2 bg-blue-500 text-white px-4 py-2 rounded">
             Selfie
