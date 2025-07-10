@@ -38,10 +38,10 @@ app.add_middleware(
 # Sunglasses recommendations
 RECOMMENDATIONS = {
     "Egg": {"recommended": ["Most styles", "Aviator", "Square"], "avoid": ["Very narrow"]},
-    "Round": {"recommended": ["Rectangle", "Square", "Wayfarer"], "avoid": ["Round", "Oval"]},
-    "Square": {"recommended": ["Round", "Oval", "Aviator"], "avoid": ["Square", "Rectangle"]},
+    "Round": {"recommended": ["Rectangle", "Square", "Wayfarer"], "avoid": ["Round", "Egg"]},
+    "Square": {"recommended": ["Round", "Egg", "Aviator"], "avoid": ["Square", "Rectangle"]},
     "Rectangular": {"recommended": ["Large Wayfarers", "Round", "Oversized"], "avoid": ["Narrow", "Rectangle"]},
-    "Inverted Triangle": {"recommended": ["Aviator", "Rimless", "Oval"], "avoid": ["Top-heavy frames"]},
+    "Inverted Triangle": {"recommended": ["Aviator", "Rimless", "Egg"], "avoid": ["Top-heavy frames"]},
     "Triangle": {"recommended": ["Cat-eye", "Rectangular", "Semi-rimless"], "avoid": ["Very narrow"]}
 }
 
@@ -118,18 +118,18 @@ def classify_face_shape(measurements):
         shape = "Rectangular"
     elif 1.3 <= face_length_width_ratio <= 1.6:
         if jaw_cheekbone_ratio < 0.9:
-            shape = "Oval"
+            shape = "Egg"
         else:
-            shape = "Diamond"
+            shape = "Inverted Triangle"
     elif face_length_width_ratio <= 1.2:
         if jaw_cheekbone_ratio > 0.95:
             shape = "Square"
         elif forehead_jaw_ratio > 1.1:
-            shape = "Heart"
+            shape = "Triangle"
         else:
             shape = "Round"
     else:
-        shape = "Oval"
+        shape = "Egg"
     log("Heuristic face shape:", shape)
     return shape
 
