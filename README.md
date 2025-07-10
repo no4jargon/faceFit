@@ -30,3 +30,6 @@ cd frontend
 npm install
 npm run dev
 ```
+
+The frontend uses [Three.js](https://threejs.org/) for a 3D overlay on the live
+camera stream. Running `npm install` will install this dependency automatically.
