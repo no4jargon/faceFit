@@ -6,7 +6,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      '/api': 'https://facefit-nntu.onrender.com',
+      '/api': 'http://localhost:8000',
     },
   },
 })
