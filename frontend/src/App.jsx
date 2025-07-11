@@ -5,7 +5,11 @@ import { drawConnectors } from '@mediapipe/drawing_utils'
 import * as THREE from 'three'
 import './index.css'
 
-const API_BASE = 'https://facefit-nntu.onrender.com/api'
+const API_BASE =
+  import.meta.env.VITE_API_BASE ||
+  (import.meta.env.DEV
+    ? 'http://localhost:8000/api'
+    : 'https://facefit-nntu.onrender.com/api')
 const API_URL = `${API_BASE}/analyze-face`
 const LOGS_URL = `${API_BASE}/logs`
 
