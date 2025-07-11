@@ -33,3 +33,11 @@ npm run dev
 
 The frontend uses [Three.js](https://threejs.org/) for a 3D overlay on the live
 camera stream. Running `npm install` will install this dependency automatically.
+
+### API base URL
+
+When running the development servers locally (`uvicorn` and `npm run dev`) the
+frontend automatically calls `http://localhost:8000/api`. During a production
+build the API base defaults to `https://facefit-nntu.onrender.com/api`. You can
+override this by setting the `VITE_API_BASE` environment variable when starting
+Vite or building the app.
