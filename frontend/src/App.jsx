@@ -21,6 +21,19 @@ function App() {
   const [mode, setMode] = useState('upload') // upload or selfie
   const [showCamera, setShowCamera] = useState(false)
   const [processing, setProcessing] = useState(false)
+  const syncDimensions = () => {
+    const video = videoRef.current
+    const canvas = overlayRef.current
+    const container = threeRef.current
+    if (video && canvas) {
+      canvas.style.width = `${video.clientWidth}px`
+      canvas.style.height = `${video.clientHeight}px`
+    }
+    if (video && container && container.firstChild) {
+      container.firstChild.style.width = `${video.clientWidth}px`
+      container.firstChild.style.height = `${video.clientHeight}px`
+    }
+  }
 
   const videoRef = useRef(null)
   const canvasRef = useRef(null)
@@ -58,6 +71,10 @@ function App() {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true })
       if (videoRef.current) {
         videoRef.current.srcObject = stream
+        const handler = () => {
+          syncDimensions()
+        }
+        videoRef.current.addEventListener('loadedmetadata', handler, { once: true })
       }
     } catch (err) {
       console.error('Camera error', err)
@@ -128,6 +145,15 @@ function App() {
       }
     }
   }, [showCamera, processing])
+
+  useEffect(() => {
+    if (!showCamera) return
+    syncDimensions()
+    window.addEventListener('resize', syncDimensions)
+    return () => {
+      window.removeEventListener('resize', syncDimensions)
+    }
+  }, [showCamera])
 
   // Periodically fetch backend logs
   useEffect(() => {
@@ -325,8 +351,12 @@ function App() {
         <div className="fixed inset-0 bg-black bg-opacity-70 flex flex-col items-center justify-center z-50">
           <div className="relative">
             <video ref={videoRef} className="w-80 h-auto" autoPlay playsInline />
-            <canvas ref={overlayRef} className="absolute top-0 left-0" />
-            <div ref={threeRef} className="absolute top-0 left-0" />
+            <canvas
+              ref={overlayRef}
+              className={processing ? 'absolute top-0 left-0 w-full h-full pointer-events-none' : 'hidden'}
+            />
+            <div ref={threeRef} className={processing ? 'absolute top-0 left-0 w-full h-full pointer-events-none' : 'hidden'} />
+            {processing && <div className="absolute inset-0 bg-white opacity-30" />}
           </div>
           <button onClick={captureSelfie} className="mt-2 bg-blue-500 text-white px-4 py-2 rounded">
             Selfie
@@ -337,9 +367,9 @@ function App() {
           <canvas ref={canvasRef} className="hidden" />
         </div>
       )}
-      <div className="mt-4 w-full">
-        <h2 className="font-semibold">Console</h2>
-        <pre className="bg-gray-900 text-green-400 p-2 h-40 overflow-y-scroll text-xs">
+      <div className="fixed bottom-2 left-1/2 -translate-x-1/2 w-11/12 max-w-xl z-40">
+        <h2 className="font-semibold text-white">Console</h2>
+        <pre className="bg-gray-900 bg-opacity-70 text-green-400 p-2 h-40 overflow-y-scroll text-xs rounded">
           {logs.join('\n')}
         </pre>
       </div>
