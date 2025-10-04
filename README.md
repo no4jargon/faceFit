@@ -1,6 +1,8 @@
 # FaceFit
 
-Simple face shape detector and sunglasses recommendation app.
+68% of males buy sunglasses that fundamentally look bad on their style of face. So unless you're a Brad Pitt or a Hrithik Roshan, in which case what you wear doesn't really matter, the most basic thing you can do is know which style of sunglasses look best on you. 
+
+PS: 96.48% of males quote statistics out of their a**es
 
 ## Development
 
