@@ -5,7 +5,13 @@ import base64
 from PIL import Image
 from io import BytesIO
 import numpy as np
-import mediapipe as mp
+# Mediapipe pulls in OpenCV which requires system libraries that are not
+# available in some testing environments. Import it lazily so the pure Python
+# helpers (and unit tests) can run without OpenCV being installed.
+try:
+    import mediapipe as mp  # type: ignore
+except ImportError:  # pragma: no cover - exercised only in limited envs
+    mp = None  # type: ignore
 import os
 from openai import OpenAI
 import google.generativeai as genai
@@ -50,7 +56,7 @@ class AnalyzePayload(BaseModel):
     method: str
     api_key: str | None = None
 
-mp_face_mesh = mp.solutions.face_mesh
+mp_face_mesh = mp.solutions.face_mesh if mp else None
 
 
 def decode_image(data: str) -> np.ndarray:
@@ -66,6 +72,9 @@ def decode_image(data: str) -> np.ndarray:
 
 def detect_landmarks(img: np.ndarray):
     # img is RGB numpy array
+    if not mp_face_mesh:
+        raise HTTPException(status_code=500, detail="Mediapipe is not available on this server")
+
     log("Detecting face landmarks")
     with mp_face_mesh.FaceMesh(static_image_mode=True) as face_mesh:
         results = face_mesh.process(img)
